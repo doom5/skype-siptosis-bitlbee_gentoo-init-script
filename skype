@@ -1,0 +1,392 @@
+#!/sbin/runscript
+## Copyright (c) 2012 by Doom5 <doom5@inbox.com>
+##
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation
+## files (the "Software"), to deal in the Software without
+## restriction, including without limitation the rights to use,
+## copy, modify, merge, publish, distribute, sublicense, and/or sell
+## copies of the Software, and to permit persons to whom the
+## Software is furnished to do so, subject to the following
+## conditions:
+##
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+## OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+## HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+## WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+## FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+## OTHER DEALINGS IN THE SOFTWARE.
+
+extra_commands="checkconfig"
+
+# All will run with this user right: 
+USER=skype
+# Virtual display number
+DISPLAY=:0
+# Temp file with dbus informations
+DBUS_TMP=/tmp/.tmp-skypedbusinfo
+
+
+# SipToSis command
+SIPTOSISCOMMAND=/home/$USER/SipToSis_20111012/SipToSis_linux
+# Skype command (not qt-static if you want use dbus)
+##SKYPECOMMAND=/home/$USER/skype_static-2.0.0.68/skype
+SKYPECOMMAND=/opt/bin/skype
+# Set the environment variable for Skype command
+SKYPEENV="LD_PRELOAD=/home/skype/bindhacks/bindhack.so"
+# Xvfb command
+XVFBCOMMAND="Xvfb $DISPLAY -- -screen 0 800x480x16"
+# Windows manager command
+WMCOMMAND=wm2
+# Vnc server command
+VNCCOMMAND=x11vnc
+# Dbus command
+DBUSLAUNCH="dbus-launch"
+# Skype daemon for Bitlbee command (comunicate with Skype trough dbus)
+SKYPEBITLBEEDAEMON="python2.7 /home/$USER/skyped"
+# Dbus address enviroinment command
+DBUS_ADDR="grep DBUS_SESSION_BUS_ADDRESS $DBUS_TMP"
+# Bitlbee command
+BITLBEECOMMAND="/usr/sbin/bitlbee -- -n -c /home/$USER/.bitlbee/bitlbee.conf"
+# Znc command
+ZNCCOMMAND="/usr/bin/znc -- -f"
+
+
+# Pid files
+XVFB_PF=/var/run/$USER/XvfbPidfile.pid
+WM_PF=/var/run/$USER/WmPidfile.pid
+VNC_PF=/var/run/$USER/VncPidfile.pid
+SKYPE_PF=/var/run/$USER/SkypePidfile.pid
+SIPTOSIS_PF=/var/run/$USER/SipToSisPidfile.pid
+BITLBEE_PF=/var/run/$USER/BitlbeePidfile.pid
+ZNC_PF=/var/run/$USER/ZncPidfile.pid
+
+
+depend() {
+	need net
+}
+
+
+startXVFB() {
+	einfo "- Starting Skype XVFB..."
+	start-stop-daemon --start -q -b -m -p $XVFB_PF -u $USER -N 5 -x $XVFBCOMMAND > /dev/null 2>&1
+        if [ $? -eq 0 ]
+        then
+		einfo "- ...Started"
+		return 0
+	else
+		eerror "- ...Error!"
+		return 1
+	fi
+}
+
+stopXVFB() {
+	start-stop-daemon --stop -p $XVFB_PF -x $XVFBCOMMAND > /dev/null 2>&1
+        if [ $? -ne 0 ]
+        then
+                kill -9 `cat $XVFB_PF`
+		rm $VNC_PF
+        fi
+        einfo "- Skype XVFB stopped"
+}
+
+
+startWm() {
+	einfo "- Starting Skype windows manager..."
+        start-stop-daemon --start -q -b -m -p $WM_PF -u $USER -N 5 -x $WMCOMMAND > /dev/null 2>&1
+        if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                eerror "- ...Error!"
+                return 1
+        fi
+}
+
+stopWm() {
+        start-stop-daemon --stop -p $WM_PF -x $WMCOMMAND -e > /dev/null 2>&1
+        if [ $? -ne 0 ]
+        then
+                kill -9 `cat $WM_PF`
+        	rm $WM_PF
+	fi 
+        einfo "- Skype windows manager stopped"
+}
+
+
+startVNC() {        
+	einfo "- Starting Skype VNC..."
+        start-stop-daemon --start -q -b -m -p $VNC_PF -u $USER -N 5 -x $VNCCOMMAND > /dev/null 2>&1
+        if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                eerror "- ...Error!"
+                return 1
+        fi
+}
+
+stopVNC() {
+        start-stop-daemon --stop -p $VNC_PF -x $VNCCOMMAND > /dev/null 2>&1
+	if [ $? -ne 0 ]
+	then
+		kill -9 `cat $VNC_PF`
+		rm $VNC_PF
+	fi
+        einfo "- Skype VNC stopped"
+}
+
+
+startDbus() {
+        einfo "- Starting Dbus daemon..."
+        sudo -u $USER $DBUSLAUNCH > $DBUS_TMP
+	if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                eerror "- ...Error!"
+                return 1
+        fi
+}
+
+stopDbus() {
+        kill -9 `grep PID $DBUS_TMP |sed 's/DBUS_SESSION_BUS_PID=//g'`
+        einfo "- Skype Dbus Daemon stopped"
+}
+
+
+startSkype() {
+	einfo "- Starting Skype Client..."
+	start-stop-daemon --start -q -b -m -p $SKYPE_PF -u $USER -N -1 -x $SKYPECOMMAND -e $SKYPEENV -e `$DBUS_ADDR` > /dev/null 2>&1
+	if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                einfo "- ...Error!"
+                return 1
+        fi
+}
+
+stopSkype() {
+        start-stop-daemon --stop -p $SKYPE_PF -x $SKYPECOMMAND > /dev/null 2>&1
+        if [ $? -ne 0 ]
+        then
+                kill -9 `cat $SKYPE_PF`
+        	rm $SKYPE_PF
+	fi
+	einfo "- Skype Client stopped"
+}
+
+
+startBitlbeeSkypeDaemon() {
+	einfo "- Starting BitlbeeSkypeDaemon..."
+	start-stop-daemon --start -b -q -i -n python2.7 -u $USER -N 5 -x $SKYPEBITLBEEDAEMON -e `$DBUS_ADDR` > /dev/null 2>&1
+        if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                eerror "- ...Error!"
+                return 1
+        fi
+}
+
+stopBitlbeeSkypeDaemon() {
+        start-stop-daemon --stop -n python2.7 -u $USER -x $SKYPEBITLBEEDAEMON > /dev/null 2>&1
+	if [ $? -ne 0 ]
+	then
+		killall -u $USER python2.7 
+	fi
+        einfo "- BitlbeeSkypeDaemon stopped"
+}
+
+
+startSipToSis() {
+        einfo "- Starting Skype SipToSis..."
+        start-stop-daemon --start -q -b -m -p $SIPTOSIS_PF -u $USER -N 5 -x $SIPTOSISCOMMAND > /dev/null 2>&1
+        if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                eerror "- ...Error!"
+                return 1
+        fi
+}
+
+stopSipToSis() {
+        start-stop-daemon --stop -p $SIPTOSIS_PF -x $SIPTOSISCOMMAND > /dev/null 2>&1
+	if [ $? -ne 0 ]
+        then
+                kill -9 `cat $SIPTOSIS_PF`
+        	rm $SIPTOSIS_PF
+	fi
+	einfo "- Skype SipToSis stopped"
+}
+
+
+startBitlbee() {
+        ebegin "- Starting Bitlbee..."
+        start-stop-daemon --start -q -b -m -p $BITLBEE_PF -u $USER -N 5 -x $BITLBEECOMMAND > /dev/null 2>&1
+        if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                eerror "- ...Error!"
+                return 1
+        fi
+}
+
+stopBitlbee() {
+        start-stop-daemon --stop -p $BITLBEE_PF -x $BITLBEECOMMAND > /dev/null 2>&1
+        if [ $? -ne 0 ]
+	then
+		kill -9 `cat $BITLBEE_PF`
+	rm $BITLBEE_PF
+	fi
+        einfo "- Bitlbee stopped"
+}
+
+
+startZnc() {
+	ebegin "- Starting ZNC..."
+        start-stop-daemon --start -q -b -m -p $ZNC_PF -u $USER -N 5 -x $ZNCCOMMAND > /dev/null 2>&1
+	if [ $? -eq 0 ]
+        then
+                einfo "- ...Started"
+                return 0
+        else
+                eerror "- ...Error!"
+                return 1
+        fi
+}
+
+stopZnc() {
+        start-stop-daemon --stop -p $ZNC_PF -x $ZNCCOMMAND > /dev/null 2>&1
+        if [ $? -ne 0 ]
+	then
+                kill -9 `cat $ZNC_PF`
+                rm $ZNC_PF
+        fi
+	einfo "- Znc stopped"
+}
+
+
+start() {
+	ebegin "Starting ALL Skype services"
+	export DISPLAY
+	checkpath -d -m 0755 -o $USER /var/run/skype
+	startXVFB
+	if [ $? -eq 0 ]
+	then	
+		sleep 2
+		startWm
+		if [ $? -eq 0 ]
+		then
+			startVNC
+			if [ $? -eq 0 ]
+			then
+                                startDbus
+                                if [ $? -eq 0 ]
+                                then
+					startSkype
+					if [ $? -eq 0 ]
+					then
+						startSipToSis
+						if [ $? -eq 0 ]
+						then
+							startBitlbeeSkypeDaemon
+							if [ $? -eq 0 ]
+							then
+                                                                startBitlbee
+                                                                if [ $? -eq 0 ]
+                                                                then
+                	                                	        startZnc
+        	                                                	if [ $? -eq 0 ]
+	                                                        	then
+        									eend $?
+										exit 0
+									fi
+								fi
+							fi
+        					fi
+					fi
+				fi
+			fi
+		fi
+	fi
+	stop
+	eend 1
+}
+
+stop() {
+	ebegin "Stopping ALL Skype services"
+
+        ps -o pid -e |grep `cat $ZNC_PF` > /dev/null
+        if [ $? -eq 0 ]
+        then
+                stopZnc
+        fi
+
+        ps -o pid -e |grep `cat $BITLBEE_PF` > /dev/null
+        if [ $? -eq 0 ]
+        then
+                stopBitlbee
+        fi
+	
+	stopBitlbeeSkypeDaemon
+	
+	ps -o pid -e |grep `cat $SIPTOSIS_PF` > /dev/null
+	if [ $? -eq 0 ]
+        then
+		stopSipToSis
+	fi
+
+	ps -o pid -e |grep `cat $SKYPE_PF` > /dev/null
+        if [ $? -eq 0 ]
+        then
+		stopSkype
+	fi
+
+        ps -o pid -e |grep `grep PID $DBUS_TMP |sed 's/DBUS_SESSION_BUS_PID=//g'` > /dev/null
+        if [ $? -eq 0 ]
+        then
+                stopDbus
+        fi
+
+	ps -o pid -e |grep `cat $VNC_PF` > /dev/null
+	if [ $? -eq 0 ]
+        then
+		stopVNC
+	fi
+
+	ps -o pid -e |grep `cat $WM_PF` > /dev/null
+        if [ $? -eq 0 ]
+        then	
+		stopWm
+	fi
+
+	ps -o pid -e |grep `cat $XVFB_PF` > /dev/null
+	if [ $? -eq 0 ]
+	then
+		stopXVFB
+	fi
+
+	##pkill -9 -u $USER
+
+	eend 0 
+}
+
+
+
+

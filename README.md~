@@ -17,9 +17,9 @@ Software neeted for this script:
 - net-im/bitlbee (whit skype USE)
 - net-irc/znc
 - SipToSis http://www.mhspot.com/sts/siptosis.html (is not in portage, 
-	installed locally. Clearly requires the JVM to run...)
+		installed locally. Clearly requires the JVM to run...)
 - bindhack http://daniel-lange.com/software/bindhack.c ( OPTIONAL - I 
-	use it to force Skype to use a specific IP address...)
+		use it to force Skype to use a specific IP address...)
 
 Other notes:
 - I place skyped in home dir (I have little modified it), this is 
