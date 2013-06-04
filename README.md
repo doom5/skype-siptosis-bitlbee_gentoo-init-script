@@ -1,14 +1,14 @@
 GENTOO headless + SKYPE + XVFB + VNC + SIPTOSIS + BITLBEE + ZNC 
 
 This is my Gentoo init script for Skype for my headless computer...
-It run SipToSis for call forwarding to a sip protocol, it run bitlbee
+It run SipToSis for call forwarding to a sip protocol and bitlbee
 for chat message (and Znc to be always online)...
 
 I publish this script to keep a backup copy, and in the hope that it 
 will be a starting point for someone ... I think it needs some changes 
 to be adapted to your environment...
 
-Software neeted for this script:
+Software needed for this script:
 - net-im/skype (with -qt-static USE if you want use Dbus then Bitlbee)
 - x11-base/xorg-server (with xvfb USE)
 - x11-misc/x11vnc
@@ -33,7 +33,7 @@ Other notes:
 I know, the script can be made much more elegant... but it works, 
 I have no feel like to change it... 
 
-I hope it can be useful...
+I hope it will be useful...
 				
 					Doom5 <doom5@inbox.com>
 
