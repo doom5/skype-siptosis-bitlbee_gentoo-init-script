@@ -35,5 +35,5 @@ I have no feel like to change it...
 
 I hope it will be useful...
 				
-					Doom5 <doom5@inbox.com>
+					Doom5 
 
